@@ -81,6 +81,27 @@ new imagesLoaded( elem, callback )
 + `options` _Object_
 + `callback` _Function_ - function triggered after all images have been loaded
 
+### Options
+
++ `timeout` _Number_ - milliseconds after which an unsettled image is counted as failed
++ `retry` _Number_ - how many times a failed image is retried before being counted as failed. Retries use exponential backoff
++ `retryDelay` _Number_ - base delay in milliseconds between retries, doubles each round. Default: `1000`
+
+``` js
+// fail images that take longer than 5 seconds, retry failed images twice
+imagesLoaded( elem, { timeout: 5000, retry: 2 }, function( instance ) {
+  console.log('all images settled');
+});
+```
+
+While retrying, a `retry` event is emitted for each round. `progress` is only triggered once an image has settled for good, so progress is never counted twice.
+
+``` js
+imgLoad.on( 'retry', function( instance, image, retryCount ) {
+  console.log( 'retrying image', image.img.src, 'round', retryCount );
+});
+```
+
 Using a callback function is the same as binding it to the `always` event (see below).
 
 ``` js

@@ -250,12 +250,12 @@ ImagesLoaded.prototype.addElementBackgroundImages = function( elem ) {
  * @param {Image} img
  */
 ImagesLoaded.prototype.addImage = function( img ) {
-  let loadingImage = new LoadingImage( img );
+  let loadingImage = new LoadingImage( img, this.options );
   this.images.push( loadingImage );
 };
 
 ImagesLoaded.prototype.addBackground = function( url, elem ) {
-  let background = new Background( url, elem );
+  let background = new Background( url, elem, this.options );
   this.images.push( background );
 };
 
@@ -276,8 +276,14 @@ ImagesLoaded.prototype.check = function() {
     } );
   };
 
+  /* eslint-disable-next-line func-style */
+  let onRetry = ( image, retryCount ) => {
+    this.emitEvent( 'retry', [ this, image, retryCount ] );
+  };
+
   this.images.forEach( function( loadingImage ) {
     loadingImage.once( 'progress', onProgress );
+    loadingImage.on( 'retry', onRetry );
     loadingImage.check();
   } );
 };
@@ -313,8 +319,10 @@ ImagesLoaded.prototype.complete = function() {
 
 // --------------------------  -------------------------- //
 
-function LoadingImage( img ) {
+function LoadingImage( img, options ) {
   this.img = img;
+  this.options = options || {};
+  this.retries = 0;
 }
 
 LoadingImage.prototype = Object.create( EvEmitter.prototype );
@@ -341,6 +349,7 @@ LoadingImage.prototype.check = function() {
   this.img.addEventListener( 'load', this );
   this.img.addEventListener( 'error', this );
   this.proxyImage.src = this.img.currentSrc || this.img.src;
+  this.startTimeout();
 };
 
 LoadingImage.prototype.getIsImageComplete = function() {
@@ -349,7 +358,45 @@ LoadingImage.prototype.getIsImageComplete = function() {
   return this.img.complete && this.img.naturalWidth;
 };
 
+// start timer to count unsettled image as failed
+LoadingImage.prototype.startTimeout = function() {
+  clearTimeout( this.timeoutTimer );
+  let { timeout } = this.options;
+  if ( !timeout ) return;
+
+  this.timeoutTimer = setTimeout( () => this.ontimeout(), timeout );
+};
+
+LoadingImage.prototype.ontimeout = function() {
+  this.unbindEvents();
+  this.confirm( false, 'timeout' );
+};
+
+// retry failed image with backoff, returns true if retrying
+LoadingImage.prototype.retry = function() {
+  let maxRetries = this.options.retry || 0;
+  if ( this.retries >= maxRetries ) return false;
+
+  this.retries++;
+  this.emitEvent( 'retry', [ this, this.retries ] );
+  setTimeout( () => this.check(), this.getRetryDelay() );
+  return true;
+};
+
+// exponential backoff, delay doubles each round
+LoadingImage.prototype.getRetryDelay = function() {
+  let retryDelay = this.options.retryDelay || 1000;
+  return retryDelay * Math.pow( 2, this.retries - 1 );
+};
+
 LoadingImage.prototype.confirm = function( isLoaded, message ) {
+  clearTimeout( this.timeoutTimer );
+  // ignore straggling events after final settle, e.g. late timeout
+  if ( this.isSettled ) return;
+  // retry before confirming failure, progress only on final settle
+  if ( !isLoaded && this.retry() ) return;
+
+  this.isSettled = true;
   this.isLoaded = isLoaded;
   let { parentNode } = this.img;
   // emit progress with parent <picture> or self <img>
@@ -386,9 +433,11 @@ LoadingImage.prototype.unbindEvents = function() {
 
 // -------------------------- Background -------------------------- //
 
-function Background( url, element ) {
+function Background( url, element, options ) {
   this.url = url;
   this.element = element;
+  this.options = options || {};
+  this.retries = 0;
   this.img = new Image();
 }
 
@@ -399,6 +448,7 @@ Background.prototype.check = function() {
   this.img.addEventListener( 'load', this );
   this.img.addEventListener( 'error', this );
   this.img.src = this.url;
+  this.startTimeout();
   // check if image is already complete
   let isComplete = this.getIsImageComplete();
   if ( isComplete ) {
@@ -413,6 +463,13 @@ Background.prototype.unbindEvents = function() {
 };
 
 Background.prototype.confirm = function( isLoaded, message ) {
+  clearTimeout( this.timeoutTimer );
+  // ignore straggling events after final settle, e.g. late timeout
+  if ( this.isSettled ) return;
+  // retry before confirming failure, progress only on final settle
+  if ( !isLoaded && this.retry() ) return;
+
+  this.isSettled = true;
   this.isLoaded = isLoaded;
   this.emitEvent( 'progress', [ this, this.element, message ] );
 };

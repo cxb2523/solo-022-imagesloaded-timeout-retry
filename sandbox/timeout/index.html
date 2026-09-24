@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width" />
+
+  <title>timeout &amp; retry</title>
+
+  <style>
+  body {
+    font-family: sans-serif;
+  }
+
+  .box {
+    display: inline-block;
+    vertical-align: top;
+    width: 220px;
+    margin: 0 10px 10px 0;
+    padding: 10px;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+  }
+
+  .box img {
+    width: 200px;
+    height: 150px;
+    object-fit: cover;
+    background: #eee;
+  }
+
+  .box.is-loading { border-color: #f0ad4e; }
+  .box.is-loaded { border-color: #5cb85c; }
+  .box.is-broken { border-color: #d9534f; }
+
+  .status { font-weight: bold; }
+  .is-loading .status { color: #f0ad4e; }
+  .is-loaded .status { color: #5cb85c; }
+  .is-broken .status { color: #d9534f; }
+  </style>
+
+</head>
+<body>
+
+  <h1>timeout &amp; retry</h1>
+
+  <p>timeout: 2000ms, retry: 2, retryDelay: 500ms（指数退避）</p>
+
+  <div id="boxes">
+    <div class="box is-loading">
+      <h3>正常图</h3>
+      <img src="../../test/img/blue-shell.jpg" />
+      <p class="status">加载中</p>
+      <p class="retries">已重试 0 次</p>
+    </div>
+    <div class="box is-loading">
+      <h3>慢图（约 3 秒）</h3>
+      <img src="https://deelay.me/3000/https://picsum.photos/400/300" />
+      <p class="status">加载中</p>
+      <p class="retries">已重试 0 次</p>
+    </div>
+    <div class="box is-loading">
+      <h3>404 图</h3>
+      <img src="../../test/img/not-there.jpg" />
+      <p class="status">加载中</p>
+      <p class="retries">已重试 0 次</p>
+    </div>
+  </div>
+
+<script src="../../imagesloaded.pkgd.js"></script>
+<script>
+var boxesElem = document.querySelector('#boxes');
+
+var imgLoad = imagesLoaded( boxesElem, {
+  timeout: 2000,
+  retry: 2,
+  retryDelay: 500,
+} );
+
+imgLoad.on( 'retry', function( loader, image, retryCount ) {
+  var box = image.img.parentNode;
+  box.querySelector('.retries').textContent = '已重试 ' + retryCount + ' 次';
+} );
+
+imgLoad.on( 'progress', function( loader, image ) {
+  var box = image.img.parentNode;
+  box.classList.remove('is-loading');
+  box.classList.add( image.isLoaded ? 'is-loaded' : 'is-broken' );
+  box.querySelector('.status').textContent = image.isLoaded ? '已成功' : '已失败';
+} );
+
+imgLoad.on( 'always', function( loader ) {
+  console.log( 'all settled, hasAnyBroken:', loader.hasAnyBroken );
+} );
+</script>
+
+</body>
+</html>
