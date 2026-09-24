@@ -162,18 +162,62 @@ ImagesLoaded.prototype.check = function() {
     return;
   }
 
+  this.images.forEach( function( loadingImage ) {
+    loadingImage.retryCount = 0;
+    this.checkImage( loadingImage );
+  }, this );
+};
+
+// base delay in ms for retry backoff, doubles each attempt
+const retryBaseDelay = 200;
+
+/**
+ * check a single image, with timeout & retry behavior
+ * @param {LoadingImage} loadingImage
+ */
+ImagesLoaded.prototype.checkImage = function( loadingImage ) {
   /* eslint-disable-next-line func-style */
-  let onProgress = ( image, elem, message ) => {
+  let onSettled = ( image, elem, message ) => {
+    this.clearImageTimeout( loadingImage );
+    let maxRetries = this.options.retry || 0;
+    if ( !image.isLoaded && loadingImage.retryCount < maxRetries ) {
+      // failed, schedule retry with backoff. do not count progress yet
+      loadingImage.retryCount++;
+      this.emitEvent( 'retry', [ this, image ] );
+      let delay = retryBaseDelay * Math.pow( 2, loadingImage.retryCount - 1 );
+      setTimeout( () => this.checkImage( loadingImage ), delay );
+      return;
+    }
     // HACK - Chrome triggers event before object properties have changed. #83
     setTimeout( () => {
       this.progress( image, elem, message );
     } );
   };
 
-  this.images.forEach( function( loadingImage ) {
-    loadingImage.once( 'progress', onProgress );
-    loadingImage.check();
-  } );
+  loadingImage.once( 'progress', onSettled );
+  this.startImageTimeout( loadingImage );
+  loadingImage.check();
+};
+
+/**
+ * @param {LoadingImage} loadingImage
+ */
+ImagesLoaded.prototype.startImageTimeout = function( loadingImage ) {
+  let { timeout } = this.options;
+  if ( !timeout ) return;
+
+  loadingImage.timeoutId = setTimeout( () => {
+    // image did not settle in time, count it as broken
+    loadingImage.unbindEvents();
+    loadingImage.confirm( false, 'timeout' );
+  }, timeout );
+};
+
+/**
+ * @param {LoadingImage} loadingImage
+ */
+ImagesLoaded.prototype.clearImageTimeout = function( loadingImage ) {
+  clearTimeout( loadingImage.timeoutId );
 };
 
 ImagesLoaded.prototype.progress = function( image, elem, message ) {

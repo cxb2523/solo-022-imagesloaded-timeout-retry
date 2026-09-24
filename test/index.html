@@ -27,6 +27,7 @@
   <script src="unit/background.js"></script>
   <script src="unit/picture.js"></script>
   <script src="unit/srcset.js"></script>
+  <script src="unit/timeout.js"></script>
 
 </head>
 <body>
@@ -161,6 +162,26 @@
         240px,
       "
     >
+  </div>
+
+  <h2>timeout</h2>
+
+  <div id="timeout-hanging">
+    <!-- unroutable IP, connection hangs and never settles -->
+    <img src="https://10.255.255.1/hanging.jpg" />
+  </div>
+
+  <div id="timeout-retry-success">
+    <img src="img/not-there.jpg" />
+  </div>
+
+  <div id="timeout-retry-fail">
+    <img src="img/not-there.jpg" />
+  </div>
+
+  <div id="timeout-progress">
+    <img src="img/blue-shell.jpg" />
+    <img src="img/not-there.jpg" />
   </div>
 
 

@@ -1,5 +1,4 @@
 const fs = require('fs');
-const { execSync } = require('child_process');
 const { minify } = require('terser');
 
 const indexPath = 'imagesloaded.js';
@@ -14,7 +13,10 @@ let paths = [
 ];
 
 // concatenate files
-execSync(`cat ${paths.join(' ')} > ${distPath}`);
+let concatContent = paths
+  .map( ( filePath ) => fs.readFileSync( `./${filePath}`, 'utf8' ) )
+  .join('\n');
+fs.writeFileSync( distPath, concatContent );
 
 // add banner
 let banner = indexContent.split(' */')[0] + ' */\n\n';

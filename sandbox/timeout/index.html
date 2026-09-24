@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width" />
+
+  <title>timeout &amp; retry</title>
+
+  <style>
+  body {
+    font-family: sans-serif;
+  }
+
+  #boxes {
+    display: flex;
+    gap: 20px;
+  }
+
+  .box {
+    width: 320px;
+    padding: 10px;
+    border: 2px solid #999;
+    border-radius: 8px;
+  }
+
+  .box h2 {
+    font-size: 16px;
+    margin: 0 0 10px;
+  }
+
+  .box img {
+    display: block;
+    width: 300px;
+    height: 200px;
+    object-fit: cover;
+    background: #eee;
+  }
+
+  .box.is-loading { border-color: #f90; }
+  .box.is-loaded { border-color: #3a3; }
+  .box.is-broken { border-color: #c33; }
+
+  .box.is-loaded .status { color: #3a3; }
+  .box.is-broken .status { color: #c33; }
+
+  .status,
+  .retries {
+    margin: 8px 0 0;
+    font-size: 14px;
+  }
+
+  #overall {
+    margin-top: 20px;
+    font-size: 18px;
+    font-weight: bold;
+  }
+  </style>
+
+</head>
+<body>
+
+  <h1>timeout &amp; retry</h1>
+
+  <p>options: <code>{ timeout: 2000, retry: 3 }</code> — 超过 2 秒未完成的图按失败算，失败后退避重试 3 轮。</p>
+
+  <div id="boxes">
+    <div class="box is-loading" id="box-normal">
+      <h2>正常图</h2>
+      <img src="https://picsum.photos/id/1025/300/200" />
+      <p class="status">加载中</p>
+      <p class="retries">重试次数：0</p>
+    </div>
+    <div class="box is-loading" id="box-slow">
+      <h2>慢图（5 秒才响应，2 秒即超时）</h2>
+      <img src="https://deelay.me/5000/https://picsum.photos/id/1069/300/200" />
+      <p class="status">加载中</p>
+      <p class="retries">重试次数：0</p>
+    </div>
+    <div class="box is-loading" id="box-missing">
+      <h2>404 图</h2>
+      <img src="not-there.jpg" />
+      <p class="status">加载中</p>
+      <p class="retries">重试次数：0</p>
+    </div>
+  </div>
+
+  <p id="overall">整体：加载中</p>
+
+<script src="../../node_modules/ev-emitter/ev-emitter.js"></script>
+<script src="../../imagesloaded.js"></script>
+<script>
+( function() {
+  let loader = imagesLoaded( '#boxes', { timeout: 2000, retry: 3 } );
+
+  function getBox( image ) {
+    return image.img.closest('.box');
+  }
+
+  loader.on( 'retry', function( instance, image ) {
+    let box = getBox( image );
+    box.querySelector('.retries').textContent = `重试次数：${image.retryCount}`;
+  } );
+
+  loader.on( 'progress', function( instance, image ) {
+    let box = getBox( image );
+    box.classList.remove('is-loading');
+    if ( image.isLoaded ) {
+      box.classList.add('is-loaded');
+      box.querySelector('.status').textContent = '已成功';
+    } else {
+      box.classList.add('is-broken');
+      box.querySelector('.status').textContent = '已失败';
+    }
+  } );
+
+  loader.on( 'always', function( instance ) {
+    let result = instance.hasAnyBroken ? '已收尾（有图片失败）' : '已收尾（全部成功）';
+    document.querySelector('#overall').textContent = `整体：${result}`;
+  } );
+} )();
+</script>
+
+</body>
+</html>
